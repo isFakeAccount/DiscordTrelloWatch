@@ -88,6 +88,7 @@ async def check_trello_activity():
                 await bot.rest.create_message(channel=channel, content=activity_summary)
 
         bot_config.prev_refresh_interval = bot_config.refresh_interval
+        logger.info(f"Sleeping for {bot_config.refresh_interval} seconds")
         await asyncio.sleep(bot_config.refresh_interval)
 
 
