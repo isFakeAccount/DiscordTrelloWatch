@@ -65,6 +65,7 @@ async def check_trello_activity():
 
     global bot_config
     while True:
+        drift_time = 0
         for channel, list_of_boards in bot_config.channels.items():
             logger.info(f"Checking trello activity {channel} id.")
             for board in list_of_boards:
@@ -94,15 +95,17 @@ async def check_trello_activity():
                     await bot.rest.create_message(channel=channel,
                                                   content=f"New/Updated Cards since {datetime.now() - timedelta(seconds=bot_config.prev_refresh_interval):%r} "
                                                           f"{datetime.now().astimezone().tzinfo}")
+                    await asyncio.sleep(1)
+                    drift_time = len(cards) + 1
                 for card in cards:
                     logger.info(f"{card}")
                     await bot.rest.create_message(channel=channel, content=f"{card}")
                     await asyncio.sleep(1)
 
         bot_config.prev_refresh_interval = bot_config.refresh_interval
-        logger.info(
-            f"Sleeping for {bot_config.refresh_interval} seconds. Scheduled to run at {datetime.now() + timedelta(seconds=bot_config.refresh_interval)}.")
-        await asyncio.sleep(bot_config.refresh_interval)
+        logger.info(f"Sleeping for {bot_config.refresh_interval - drift_time} seconds. Scheduled to run at "
+                    f"{datetime.now() + timedelta(seconds=(bot_config.refresh_interval - drift_time))}.")
+        await asyncio.sleep(bot_config.refresh_interval - drift_time)
 
 
 async def get_board(board_id: str):
