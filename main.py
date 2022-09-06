@@ -80,13 +80,12 @@ async def check_trello_activity():
                             if diff <= timedelta(seconds=bot_config.prev_refresh_interval):
                                 cards.add(f"https://trello.com/c/{action['data']['card']['shortLink']}")
 
-                activity_summary = "New/Updated Cards\n\n"
-                for card in cards:
-                    activity_summary = f"{activity_summary}{card}\n\n"
-
                 if cards:
-                    logger.info(activity_summary)
-                    await bot.rest.create_message(channel=channel, content=activity_summary)
+                    await bot.rest.create_message(channel=channel, content="New/Updated Cards")
+                for card in cards:
+                    logger.info(f"{card}")
+                    await bot.rest.create_message(channel=channel, content=f"{card}")
+                    await asyncio.sleep(1)
 
         bot_config.prev_refresh_interval = bot_config.refresh_interval
         logger.info(
