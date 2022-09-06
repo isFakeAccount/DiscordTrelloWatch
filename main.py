@@ -82,13 +82,15 @@ async def check_trello_activity():
 
                 activity_summary = "New/Updated Cards\n\n"
                 for card in cards:
-                    activity_summary = f"{activity_summary}{card}\n"
+                    activity_summary = f"{activity_summary}{card}\n\n"
 
-                logger.info(activity_summary)
-                await bot.rest.create_message(channel=channel, content=activity_summary)
+                if cards:
+                    logger.info(activity_summary)
+                    await bot.rest.create_message(channel=channel, content=activity_summary)
 
         bot_config.prev_refresh_interval = bot_config.refresh_interval
-        logger.info(f"Sleeping for {bot_config.refresh_interval} seconds")
+        logger.info(
+            f"Sleeping for {bot_config.refresh_interval} seconds. Scheduled to run at {datetime.now() + timedelta(seconds=bot_config.refresh_interval)}.")
         await asyncio.sleep(bot_config.refresh_interval)
 
 
