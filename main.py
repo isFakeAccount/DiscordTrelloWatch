@@ -6,6 +6,7 @@ import os
 import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from logging.handlers import RotatingFileHandler
 from traceback import format_exc
 
 import aiohttp
@@ -33,6 +34,15 @@ def create_logger(module_name: str, level: int | str = logging.INFO) -> logging.
     log_stream.setFormatter(formatter)
     logger.addHandler(log_stream)
     logger.propagate = False
+
+    # Limit file size to 5MB
+    log_file = RotatingFileHandler("Discord_Trello.log", maxBytes=5 * 1024 * 1024, backupCount=1)
+    log_file.setLevel(level)
+    formatter = logging.Formatter('[%(asctime)s] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] %(message)s')
+    log_file.setFormatter(formatter)
+    logger.addHandler(log_file)
+    logger.propagate = False
+
     return logger
 
 
@@ -81,7 +91,9 @@ async def check_trello_activity():
                                 cards.add(f"https://trello.com/c/{action['data']['card']['shortLink']}")
 
                 if cards:
-                    await bot.rest.create_message(channel=channel, content="New/Updated Cards")
+                    await bot.rest.create_message(channel=channel,
+                                                  content=f"New/Updated Cards since {datetime.now() - timedelta(seconds=bot_config.prev_refresh_interval):%r} "
+                                                          f"{datetime.now().astimezone().tzinfo}")
                 for card in cards:
                     logger.info(f"{card}")
                     await bot.rest.create_message(channel=channel, content=f"{card}")
