@@ -4,7 +4,6 @@ import asyncio
 import logging
 import os
 import re
-import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from logging.handlers import RotatingFileHandler
@@ -54,59 +53,65 @@ class Config:
     channels: dict[int, set[tuple[str, str]]]
 
 
-async def check_trello_activity():
+async def check_updates():
     """
     Iterate through all boards and checks their activities. All activity since Current Time - Refresh Interval is grabbed and sent to discord server.
+
+    :return: None
+    """
+    for channel, list_of_boards in bot_config.channels.items():
+        logger.info(f"Checking trello activity {channel} id.")
+        for board in list_of_boards:
+            cards = set()
+            board_id = re.search(r"b/(.*)/", board[1]).group(1)
+            async with aiohttp.ClientSession(headers={"Accept": "application/json"}) as session:
+                query = {
+                    'key': os.getenv('TRELLO_API_KEY'),
+                    'token': os.getenv('TRELLO_TOKEN'),
+                    'filter': 'copyCard,createCard,updateCard',
+                    'limit': "1000"
+                }
+                async with session.get(f"https://api.trello.com/1/boards/{board_id}/actions", params=query) as resp:
+                    board_actions = await resp.json()
+                    if resp.status != 200:
+                        break
+
+                    for action in board_actions:
+                        # since python datetime doesn't follow ISO standard fully
+                        action_time = datetime.fromisoformat(action['date'].replace('Z', ""))
+                        diff = datetime.utcnow() - action_time
+                        logger.info(f"{action['data']['card']['shortLink']} {datetime.now()} - {action_time} = {diff}.")
+                        if diff <= timedelta(seconds=bot_config.prev_refresh_interval):
+                            cards.add(f"https://trello.com/c/{action['data']['card']['shortLink']}")
+
+            if cards:
+                await bot.rest.create_message(channel=channel,
+                                              content=f"New/Updated Cards since {datetime.now() - timedelta(seconds=bot_config.prev_refresh_interval):%r} "
+                                                      f"{datetime.now().astimezone().tzinfo}")
+                await asyncio.sleep(1)
+            for card in cards:
+                logger.info(f"{card}")
+                await bot.rest.create_message(channel=channel, content=f"{card}")
+                await asyncio.sleep(1)
+
+
+async def monitor_trello_activity():
+    """
+    Creates an async task that checks all the new activities in trello boards.
 
     prev_refresh_interval is used because if refresh interval is changed. The effects are applied after one iteration.
     Example: If Refresh Interval is changed from 1 hour to 5 seconds. The next time check_trello_activity triggers is when 1 hour finishes. If we only
     check for last 5 seconds, the bot will miss cards.
-    :return:
+    :return: None
     """
 
     global bot_config
     while True:
-        drift_time = time.perf_counter()
-        for channel, list_of_boards in bot_config.channels.items():
-            logger.info(f"Checking trello activity {channel} id.")
-            for board in list_of_boards:
-                cards = set()
-                board_id = re.search(r"b/(.*)/", board[1]).group(1)
-                async with aiohttp.ClientSession(headers={"Accept": "application/json"}) as session:
-                    query = {
-                        'key': os.getenv('TRELLO_API_KEY'),
-                        'token': os.getenv('TRELLO_TOKEN'),
-                        'filter': 'copyCard,createCard,updateCard',
-                        'limit': "1000"
-                    }
-                    async with session.get(f"https://api.trello.com/1/boards/{board_id}/actions", params=query) as resp:
-                        board_actions = await resp.json()
-                        if resp.status != 200:
-                            break
-
-                        for action in board_actions:
-                            # since python datetime doesn't follow ISO standard fully
-                            action_time = datetime.fromisoformat(action['date'].replace('Z', ""))
-                            diff = datetime.utcnow() - action_time
-                            logger.info(f"{action['data']['card']['shortLink']} {datetime.now()} - {action_time} = {diff}.")
-                            if diff <= timedelta(seconds=bot_config.prev_refresh_interval):
-                                cards.add(f"https://trello.com/c/{action['data']['card']['shortLink']}")
-
-                if cards:
-                    await bot.rest.create_message(channel=channel,
-                                                  content=f"New/Updated Cards since {datetime.now() - timedelta(seconds=bot_config.prev_refresh_interval):%r} "
-                                                          f"{datetime.now().astimezone().tzinfo}")
-                    await asyncio.sleep(1)
-                for card in cards:
-                    logger.info(f"{card}")
-                    await bot.rest.create_message(channel=channel, content=f"{card}")
-                    await asyncio.sleep(1)
-
+        asyncio.create_task(check_updates())
         bot_config.prev_refresh_interval = bot_config.refresh_interval
-        drift_time = time.perf_counter() - drift_time
-        logger.info(f"Sleeping for {bot_config.refresh_interval - drift_time} seconds. Scheduled to run at "
-                    f"{datetime.now() + timedelta(seconds=(bot_config.refresh_interval - drift_time))}.")
-        await asyncio.sleep(bot_config.refresh_interval - drift_time)
+        logger.info(
+            f"Sleeping for {bot_config.refresh_interval} seconds. Scheduled to run at {datetime.now() + timedelta(seconds=bot_config.refresh_interval)}.")
+        await asyncio.sleep(bot_config.refresh_interval)
 
 
 async def get_board(board_id: str):
@@ -234,7 +239,7 @@ async def watch_board(ctx: crescent.Context, board_url: str):
 def main():
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    loop.create_task(check_trello_activity())
+    loop.create_task(monitor_trello_activity())
     bot.run()
 
 
