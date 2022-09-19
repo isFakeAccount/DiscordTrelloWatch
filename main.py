@@ -67,7 +67,7 @@ class Config:
                 watch_list = json.load(fp)
                 return cls.from_json(watch_list)
         else:
-            Config(3600, 3600, dict())
+            return Config(3600, 3600, dict())
 
     def export_to_json(self):
         """
