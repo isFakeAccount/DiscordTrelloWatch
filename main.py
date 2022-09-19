@@ -1,20 +1,24 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
-import os
 import re
+import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from logging.handlers import RotatingFileHandler
+from os import getenv
+from pathlib import Path
 from traceback import format_exc
 
 import aiohttp
 import crescent
+from dataclasses_json import dataclass_json
 from dotenv import load_dotenv
 
 load_dotenv('config.env')
-bot = crescent.Bot(os.getenv('discord_token'))
+bot = crescent.Bot(getenv('discord_token'))
 
 
 def create_logger(module_name: str, level: int | str = logging.INFO) -> logging.Logger:
@@ -46,11 +50,31 @@ def create_logger(module_name: str, level: int | str = logging.INFO) -> logging.
     return logger
 
 
+@dataclass_json
 @dataclass
 class Config:
     refresh_interval: float
     prev_refresh_interval: float
     channels: dict[int, set[tuple[str, str]]]
+
+    @classmethod
+    def import_from_json(cls) -> Config:
+        """
+        get the json formatted string
+        """
+        if Path('watch_list.json').exists():
+            with open('watch_list.json', 'r') as fp:
+                watch_list = json.load(fp)
+                return cls.from_json(watch_list)
+        else:
+            Config(3600, 3600, dict())
+
+    def export_to_json(self):
+        """
+        get the json formatted string
+        """
+        with open('watch_list.json', 'w') as fp:
+            json.dump(self.to_json(), fp)
 
 
 async def check_updates():
@@ -66,8 +90,8 @@ async def check_updates():
             board_id = re.search(r"b/(.*)/", board[1]).group(1)
             async with aiohttp.ClientSession(headers={"Accept": "application/json"}) as session:
                 query = {
-                    'key': os.getenv('TRELLO_API_KEY'),
-                    'token': os.getenv('TRELLO_TOKEN'),
+                    'key': getenv('TRELLO_API_KEY'),
+                    'token': getenv('TRELLO_TOKEN'),
                     'filter': 'copyCard,createCard,updateCard',
                     'limit': "1000"
                 }
@@ -107,11 +131,13 @@ async def monitor_trello_activity():
 
     global bot_config
     while True:
+        start_perf_cn = time.perf_counter()
         asyncio.create_task(check_updates())
         bot_config.prev_refresh_interval = bot_config.refresh_interval
         logger.info(
             f"Sleeping for {bot_config.refresh_interval} seconds. Scheduled to run at {datetime.now() + timedelta(seconds=bot_config.refresh_interval)}.")
-        await asyncio.sleep(bot_config.refresh_interval)
+        diff = time.perf_counter() - start_perf_cn
+        await asyncio.sleep(bot_config.refresh_interval - diff)
 
 
 async def get_board(board_id: str):
@@ -126,8 +152,8 @@ async def get_board(board_id: str):
     """
     async with aiohttp.ClientSession(headers={"Accept": "application/json"}) as session:
         query = {
-            'key': os.getenv('TRELLO_API_KEY'),
-            'token': os.getenv('TRELLO_TOKEN')
+            'key': getenv('TRELLO_API_KEY'),
+            'token': getenv('TRELLO_TOKEN')
         }
         async with session.get(f"https://api.trello.com/1/boards/{board_id}", params=query) as resp:
             resp.raise_for_status()
@@ -135,7 +161,7 @@ async def get_board(board_id: str):
 
 
 @bot.include
-@crescent.command(description="List all the boards being watched in the current channel.", guild=int(os.getenv('guild_id')))
+@crescent.command(description="List all the boards being watched in the current channel.", guild=int(getenv('guild_id')))
 async def list_boards(ctx: crescent.Context, all_boards: bool = False):
     """
     List all the boards being watched.
@@ -145,7 +171,7 @@ async def list_boards(ctx: crescent.Context, all_boards: bool = False):
     :return: None
     """
 
-    logger.info(f"list board command {ctx.channel.name} all_boards {all_boards}.")
+    logger.info(f"list board command {ctx.guild.get_channel(ctx.channel_id).name} all_boards {all_boards}.")
     if all_boards:
         watched_boards_summary = ""
         for channel_id, list_of_boards in bot_config.channels.items():
@@ -163,7 +189,7 @@ async def list_boards(ctx: crescent.Context, all_boards: bool = False):
 
 
 @bot.include
-@crescent.command(description="Deletes all the watched boards", guild=int(os.getenv('guild_id')))
+@crescent.command(description="Deletes all the watched boards", guild=int(getenv('guild_id')))
 async def reset_bot(ctx: crescent.Context):
     """
     Rests the bot to initial state.
@@ -175,12 +201,13 @@ async def reset_bot(ctx: crescent.Context):
 
     bot_config.refresh_interval = 3600
     bot_config.channels = dict()
-    logger.info("All watches are deleted.")
+    Path("watch_list.json").unlink(missing_ok=True)
+    logger.info("All watches are deleted (including json file).")
     await ctx.respond("All watches are deleted.")
 
 
 @bot.include
-@crescent.command(description="Sets the refresh interval (minutes).", guild=int(os.getenv('guild_id')))
+@crescent.command(description="Sets the refresh interval (minutes).", guild=int(getenv('guild_id')))
 async def set_refresh_interval(ctx: crescent.Context, refresh_interval: float):
     """
     Sets the refresh interval. It is the duration after which all boards are polled.
@@ -196,7 +223,7 @@ async def set_refresh_interval(ctx: crescent.Context, refresh_interval: float):
 
 
 @bot.include
-@crescent.command(description="Watches the boards and sends the updates in current channel.", guild=int(os.getenv('guild_id')))
+@crescent.command(description="Watches the boards and sends the updates in current channel.", guild=int(getenv('guild_id')))
 async def watch_board(ctx: crescent.Context, board_url: str):
     """
     Adds board to the list of watched boards.
@@ -231,7 +258,7 @@ async def watch_board(ctx: crescent.Context, board_url: str):
         boards.add((board.get('name'), board_url))
     else:
         bot_config.channels[ctx.channel_id] = {(board.get('name'), board_url)}
-
+    bot_config.export_to_json()
     logger.info(f"Added board {board.get('name')}: {board_url}.")
     await ctx.respond(f"Added board {board.get('name')}: {board_url} to current channel")
 
@@ -244,6 +271,6 @@ def main():
 
 
 if __name__ == '__main__':
-    bot_config = Config(3600, 3600, dict())
+    bot_config = Config.import_from_json()
     logger = create_logger("main.py")
     main()
