@@ -49,7 +49,6 @@ def create_logger(module_name: str, level: int | str = logging.INFO) -> logging.
     return logger
 
 
-@dataclass_json
 @dataclass
 class Config:
     refresh_interval: float
