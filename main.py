@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
+import pickle
 import re
 import time
 from dataclasses import dataclass
@@ -14,7 +14,6 @@ from traceback import format_exc
 
 import aiohttp
 import crescent
-from dataclasses_json import dataclass_json
 from dotenv import load_dotenv
 
 load_dotenv('config.env')
@@ -58,23 +57,22 @@ class Config:
     channels: dict[int, set[tuple[str, str]]]
 
     @classmethod
-    def import_from_json(cls) -> Config:
+    def import_from_pickle(cls) -> Config:
         """
-        get the json formatted string
+        Loads the Object from Pickle File
         """
-        if Path('watch_list.json').exists():
-            with open('watch_list.json', 'r') as fp:
-                watch_list = json.load(fp)
-                return cls.from_dict(watch_list)
+        if Path('watch_list.pkl').exists():
+            with open('watch_list.pkl', 'rb') as fp:
+                return pickle.load(fp)
         else:
             return Config(3600, 3600, dict())
 
-    def export_to_json(self):
+    def export_to_pickle(self):
         """
-        get the json formatted string
+        Exports the Object to Pickle File
         """
-        with open('watch_list.json', 'w') as fp:
-            json.dump(self.to_dict(), fp)
+        with open('watch_list.pkl', 'wb') as fp:
+            pickle.dump(self, fp)
 
 
 async def check_updates():
@@ -258,7 +256,7 @@ async def watch_board(ctx: crescent.Context, board_url: str):
         boards.add((board.get('name'), board_url))
     else:
         bot_config.channels[ctx.channel_id] = {(board.get('name'), board_url)}
-    bot_config.export_to_json()
+    bot_config.export_to_pickle()
     logger.info(f"Added board {board.get('name')}: {board_url}.")
     await ctx.respond(f"Added board {board.get('name')}: {board_url} to current channel")
 
@@ -271,6 +269,6 @@ def main():
 
 
 if __name__ == '__main__':
-    bot_config = Config.import_from_json()
+    bot_config = Config.import_from_pickle()
     logger = create_logger("main.py")
     main()

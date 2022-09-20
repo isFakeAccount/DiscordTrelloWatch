@@ -1,6 +1,6 @@
 .idea
 config.env
-watch_list.json
+watch_list.pkl
 
 ### Python template
 # Byte-compiled / optimized / DLL files
