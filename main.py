@@ -65,7 +65,7 @@ class Config:
         if Path('watch_list.json').exists():
             with open('watch_list.json', 'r') as fp:
                 watch_list = json.load(fp)
-                return cls.from_json(watch_list)
+                return cls.from_dict(watch_list)
         else:
             return Config(3600, 3600, dict())
 
@@ -74,7 +74,7 @@ class Config:
         get the json formatted string
         """
         with open('watch_list.json', 'w') as fp:
-            json.dump(self.to_json(), fp)
+            json.dump(self.to_dict(), fp)
 
 
 async def check_updates():
