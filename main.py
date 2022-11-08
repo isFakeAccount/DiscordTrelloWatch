@@ -106,13 +106,17 @@ async def check_updates():
                             cards.add(f"https://trello.com/c/{action['data']['card']['shortLink']}")
 
             if cards:
-                await bot.rest.create_message(channel=channel,
-                                              content=f"New/Updated Cards since {datetime.now() - timedelta(seconds=bot_config.prev_refresh_interval):%r} "
-                                                      f"{datetime.now().astimezone().tzinfo}")
+                message_item = await bot.rest.create_message(channel=channel,
+                                                             content=f"New/Updated Cards since "
+                                                                     f"{datetime.now() - timedelta(seconds=bot_config.prev_refresh_interval):%r} "
+                                                                     f"{datetime.now().astimezone().tzinfo}")
+
+                await bot.rest.crosspost_message(channel=channel, message=message_item)
                 await asyncio.sleep(1)
             for card in cards:
                 logger.info(f"{card}")
-                await bot.rest.create_message(channel=channel, content=f"{card}")
+                message_item = await bot.rest.create_message(channel=channel, content=f"{card}")
+                await bot.rest.crosspost_message(channel=channel, message=message_item)
                 await asyncio.sleep(1)
 
 
