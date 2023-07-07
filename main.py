@@ -18,7 +18,7 @@ from dotenv import load_dotenv
 
 load_dotenv('config.env')
 bot = crescent.Bot(getenv('discord_token'))
-
+client = crescent.Client(bot)
 
 def create_logger(module_name: str, level: int | str = logging.INFO) -> logging.Logger:
     """
@@ -106,17 +106,17 @@ async def check_updates():
                             cards.add(f"https://trello.com/c/{action['data']['card']['shortLink']}")
 
             if cards:
-                message_item = await bot.rest.create_message(channel=channel,
-                                                             content=f"New/Updated Cards since "
-                                                                     f"{datetime.now() - timedelta(seconds=bot_config.prev_refresh_interval):%r} "
-                                                                     f"{datetime.now().astimezone().tzinfo}")
+                message_item = await client.rest.create_message(channel=channel,
+                                                                content=f"New/Updated Cards since "
+                                                                        f"{datetime.now() - timedelta(seconds=bot_config.prev_refresh_interval):%r} "
+                                                                        f"{datetime.now().astimezone().tzinfo}")
 
-                await bot.rest.crosspost_message(channel=channel, message=message_item)
+                await client.rest.crosspost_message(channel=channel, message=message_item)
                 await asyncio.sleep(1)
             for card in cards:
                 logger.info(f"{card}")
-                message_item = await bot.rest.create_message(channel=channel, content=f"{card}")
-                await bot.rest.crosspost_message(channel=channel, message=message_item)
+                message_item = await client.rest.create_message(channel=channel, content=f"{card}")
+                await client.rest.crosspost_message(channel=channel, message=message_item)
                 await asyncio.sleep(1)
 
 
@@ -161,7 +161,7 @@ async def get_board(board_id: str):
             return await resp.json()
 
 
-@bot.include
+@client.include
 @crescent.command(description="List all the boards being watched in the current channel.", guild=int(getenv('guild_id')))
 async def list_boards(ctx: crescent.Context, all_boards: bool = False):
     """
@@ -189,7 +189,7 @@ async def list_boards(ctx: crescent.Context, all_boards: bool = False):
             await ctx.respond("No boards are being watched in current channel.")
 
 
-@bot.include
+@client.include
 @crescent.command(description="Deletes all the watched boards", guild=int(getenv('guild_id')))
 async def reset_bot(ctx: crescent.Context):
     """
@@ -207,7 +207,7 @@ async def reset_bot(ctx: crescent.Context):
     await ctx.respond("All watches are deleted.")
 
 
-@bot.include
+@client.include
 @crescent.command(description="Sets the refresh interval (minutes).", guild=int(getenv('guild_id')))
 async def set_refresh_interval(ctx: crescent.Context, refresh_interval: float):
     """
@@ -223,7 +223,7 @@ async def set_refresh_interval(ctx: crescent.Context, refresh_interval: float):
     await ctx.respond(f"Refresh interval is set to {refresh_interval} minutes.")
 
 
-@bot.include
+@client.include
 @crescent.command(description="Watches the boards and sends the updates in current channel.", guild=int(getenv('guild_id')))
 async def watch_board(ctx: crescent.Context, board_url: str):
     """
