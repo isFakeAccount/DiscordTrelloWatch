@@ -14,10 +14,11 @@ from traceback import format_exc
 
 import aiohttp
 import crescent
+import hikari
 from dotenv import load_dotenv
 
 load_dotenv('config.env')
-bot = crescent.Bot(getenv('discord_token'))
+bot = hikari.GatewayBot(getenv('discord_token'))
 client = crescent.Client(bot)
 
 def create_logger(module_name: str, level: int | str = logging.INFO) -> logging.Logger:
