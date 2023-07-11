@@ -17,9 +17,10 @@ import crescent
 import hikari
 from dotenv import load_dotenv
 
-load_dotenv('config.env')
-bot = hikari.GatewayBot(getenv('discord_token'))
+load_dotenv()
+bot = hikari.GatewayBot(getenv('DISCORD_TOKEN'))
 client = crescent.Client(bot)
+
 
 def create_logger(module_name: str, level: int | str = logging.INFO) -> logging.Logger:
     """
@@ -163,7 +164,7 @@ async def get_board(board_id: str):
 
 
 @client.include
-@crescent.command(description="List all the boards being watched in the current channel.", guild=int(getenv('guild_id')))
+@crescent.command(description="List all the boards being watched in the current channel.", guild=int(getenv('GUILD_ID')))
 async def list_boards(ctx: crescent.Context, all_boards: bool = False):
     """
     List all the boards being watched.
@@ -191,7 +192,7 @@ async def list_boards(ctx: crescent.Context, all_boards: bool = False):
 
 
 @client.include
-@crescent.command(description="Deletes all the watched boards", guild=int(getenv('guild_id')))
+@crescent.command(description="Deletes all the watched boards", guild=int(getenv('GUILD_ID')))
 async def reset_bot(ctx: crescent.Context):
     """
     Rests the bot to initial state.
@@ -209,7 +210,7 @@ async def reset_bot(ctx: crescent.Context):
 
 
 @client.include
-@crescent.command(description="Sets the refresh interval (minutes).", guild=int(getenv('guild_id')))
+@crescent.command(description="Sets the refresh interval (minutes).", guild=int(getenv('GUILD_ID')))
 async def set_refresh_interval(ctx: crescent.Context, refresh_interval: float):
     """
     Sets the refresh interval. It is the duration after which all boards are polled.
@@ -225,7 +226,7 @@ async def set_refresh_interval(ctx: crescent.Context, refresh_interval: float):
 
 
 @client.include
-@crescent.command(description="Watches the boards and sends the updates in current channel.", guild=int(getenv('guild_id')))
+@crescent.command(description="Watches the boards and sends the updates in current channel.", guild=int(getenv('GUILD_ID')))
 async def watch_board(ctx: crescent.Context, board_url: str):
     """
     Adds board to the list of watched boards.
